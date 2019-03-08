@@ -8,15 +8,28 @@ from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_mail import Mail, Message
 import os
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
+
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'hardtoguessstring'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///'+os.path.join(basedir,'data.sqlite')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAIL_SUPPRESS_SEND'] = os.environ.get('MAIL_SUPPRESS_SEND')
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
+app.config['MAIL_PORT'] = os.environ.get('MAIL_PORT')
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL')
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+app.config['MAIL_SENDER'] = os.environ.get('MAIL_SENDER')
+
+mail = Mail(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app,db)
+
 
 class Role(db.Model):
    __tablename__='roles'
@@ -63,7 +76,9 @@ def index():
          db.session.add(user)
          db.session.commit()
          session['known'] = False
-      else:
+         #if app.config['FLASKY_ADMIN']:
+         #   send_email(app.config['FLASKY_ADMIN'],'Newuser', 'mail/new_user', user=user)
+         #else:
          session['known'] = True
 #      if old_name is not None and old_name != form.name.data:
 #         flash('Looks like you have changed your name!')
@@ -81,6 +96,15 @@ def user(name):
 @app.shell_context_processor
 def make_shell_context():
    return dict(db=db, User=User, Role=Role)
+
+
+def send_email(template, **kwargs):
+   msg = Message(sender=app.config['MAIL_SENDER'])
+   msg.body = render_template(template+'.txt', **kwargs)
+   msg.html = render_template(template+'.html', **kwargs)
+   msg.subject = 'Testing from Flask Email Program'
+   msg.recipients = ["gandalfwong@gmail.com"]
+   mail.send(msg)
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port="5000", debug=True)
